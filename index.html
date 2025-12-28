@@ -8,45 +8,116 @@
 <title>StandBy mimic — rotated (seconds)</title>
 <style>
   :root{
+    --rot:90deg;
     --bg:#000;
     --fg:#fff;
-    /* logical "landscape" dimensions: swap vw/vh so layout is based on rotated viewport */
-    --land-w:100vh; /* width of the rotated (landscape) canvas */
-    --land-h:100vw; /* height of the rotated (landscape) canvas */
+    --land-w:100vh;
+    --land-h:100vw;
     --safe-top: env(safe-area-inset-top);
     --safe-bottom: env(safe-area-inset-bottom);
   }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);-webkit-user-select:none;overflow:hidden;font-family:-apple-system,"Hiragino Kaku Gothic ProN","SF Pro Text",Segoe UI,Roboto,sans-serif}
-
-  /* The rotator container is already rotated 90deg so the internal layout is landscape
-     no matter how the device is held. It is centered in the viewport. */
-  #rotator{
-    position:absolute;left:50%;top:50%;
-    width:var(--land-w);height:var(--land-h);
-    transform:translate(-50%,-50%) rotate(90deg);
-    transform-origin:center center;
-    display:flex;align-items:center;justify-content:center;box-sizing:border-box;
-    padding-top:calc(var(--safe-top) + 8px);padding-bottom:calc(var(--safe-bottom) + 8px);
-    text-align:center;
+  html,body{
+    height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    user-select:none; -webkit-user-select:none; /* prevent text selection during swipe */
   }
 
-  .clock{font-weight:600;line-height:0.92;letter-spacing:0.02em}
-  /* slightly reduce base size to make room for seconds */
+  /* base sizes relative to logical landscape width */
   .time{font-size:calc(var(--land-w) * 0.16);}
-  .date{font-size:calc(var(--land-w) * 0.045);opacity:0.7;margin-top:0.5rem}
+  .date{font-size:calc(var(--land-w) * 0.045);opacity:0.9;margin-top:0.5rem}
+  @media (min-width:900px){.time{font-size:120px}.date{font-size:28px}}
 
-  /* keep readable on large screens */
-  @media (min-width:900px){
-    .time{font-size:120px}
-    .date{font-size:28px}
+  /* Rotator - holds the landscape UI and rotates it when needed */
+  #rotator{position:fixed;left:50%;top:50%;width:var(--land-w);height:var(--land-h);transform:translate(-50%,-50%) rotate(var(--rot));transform-origin:center center;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding-top:calc(var(--safe-top) + 8px);padding-bottom:calc(var(--safe-bottom) + 8px)}
+
+  /* LiquidGlass text — Safari safe version */
+  .glass-text{
+    color:#fff; /* always-visible fallback */
+    text-shadow:0 2px 6px rgba(0,0,0,0.65),0 0 8px rgba(255,255,255,0.18);
   }
+  /* enhance only if background-clip:text is reliable */
+  @supports (-webkit-background-clip:text){
+    .glass-text{
+      background:linear-gradient(120deg,
+        rgba(255,255,255,0.98),
+        rgba(210,230,255,0.95),
+        rgba(255,255,255,0.98));
+      -webkit-background-clip:text;
+      background-clip:text;
+      /* DO NOT fully transparent-fill on Safari rotations */
+      -webkit-text-fill-color: rgba(255,255,255,0.92);
+    }
+  }
+
+  /* Clock (glass slab) - fixed size and centered content */
+  .clock{
+    --tilt-x:0deg;--tilt-y:0deg;--glass-alpha:0.10;--glass-blur:12px;--glass-sat:1.2;
+    width:calc(var(--land-w) * 0.55);max-width:900px;min-width:420px;
+    height:calc(var(--land-h) * 0.5);max-height:640px;min-height:260px;
+    padding:2.2rem 2.8rem;border-radius:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transform:perspective(800px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));transition:transform .15s ease-out;box-sizing:border-box;
+    background:
+    /* edge-bright LiquidGlass: brightest along edges (flat), corners suppressed */
+    linear-gradient(to top, rgba(255,255,255,calc(var(--glass-alpha)*1.8)) 0%, rgba(255,255,255,0.02) 35%),
+    linear-gradient(to bottom, rgba(255,255,255,calc(var(--glass-alpha)*1.8)) 0%, rgba(255,255,255,0.02) 35%),
+    linear-gradient(to left, rgba(255,255,255,calc(var(--glass-alpha)*1.8)) 0%, rgba(255,255,255,0.02) 35%),
+    linear-gradient(to right, rgba(255,255,255,calc(var(--glass-alpha)*1.8)) 0%, rgba(255,255,255,0.02) 35%),
+    /* corner suppressor */
+    radial-gradient(circle at 0% 0%, rgba(255,255,255,0.0) 60%, rgba(255,255,255,0.0) 100%),
+    radial-gradient(circle at 100% 0%, rgba(255,255,255,0.0) 60%, rgba(255,255,255,0.0) 100%),
+    radial-gradient(circle at 0% 100%, rgba(255,255,255,0.0) 60%, rgba(255,255,255,0.0) 100%),
+    radial-gradient(circle at 100% 100%, rgba(255,255,255,0.0) 60%, rgba(255,255,255,0.0) 100%);
+    backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));box-shadow:inset 0 0 0 1px rgba(255,255,255,0.35),inset 0 0 32px rgba(255,255,255,0.18);
+  }
+
+  /* Settings drawer: hidden at "landscape top" (= portrait right), slides inward */
+  #settingsDrawer{
+    position:fixed;
+    top:0; bottom:0; right:0;
+    width:320px; max-width:80vw;
+    background:rgba(20,20,20,0.92);
+    color:#fff;
+    padding:0; /* inner handles centering */
+    border-top-left-radius:14px;
+    border-bottom-left-radius:14px;
+    transform: translateX(100%);
+    transition: transform .35s cubic-bezier(.22,.9,.27,1);
+    box-shadow:-10px 0 30px rgba(0,0,0,0.6);
+    z-index:1000;
+    pointer-events:none;
+    opacity:1;
+    overflow:hidden; /* stable clipping */
+}
+  #settingsDrawer.open{
+    transform: translateX(0);
+}
+  #settingsDrawer .row{display:flex;align-items:center;gap:8px;margin-top:10px}
+  #settingsDrawer label{flex:1;font-size:14px}
+  #settingsDrawer input[type=range]{width:140px}
+
+  /* close button */
+  .closeBtn{position:absolute;left:10px;top:8px;background:transparent;border:0;color:#fff;font-size:16px}
+
 </style>
 </head>
 <body>
+  <!-- Top drawer (unrotated, screen coordinates) -->
+  <div id="settingsDrawer" aria-hidden="true">
+    <div id="settingsInner" style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(var(--rot)); transform-origin:center; display:flex; flex-direction:column; gap:14px; color:#fff; text-align:left; width:260px;">
+      <button class="closeBtn" id="closeDrawer">✕</button>
+      <div><strong>Settings</strong></div>
+      <div class="row"><label><input type="checkbox" id="toggleSeconds" checked> 秒を表示</label></div>
+      <div class="row"><label><input type="checkbox" id="toggleWeekday" checked> 曜日を表示</label></div>
+      <div class="row"><label>透明度</label><input type="range" id="alpha" min="0.02" max="0.3" step="0.01" value="0.10"></div>
+      <div class="row"><label>屈折(ぼかし)</label><input type="range" id="blur" min="4" max="24" step="1" value="12"></div>
+    </div>
+  </div>
+  <div id="drawerOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:900;"></div>
+
+  <!-- Rotated content (landscape UI) -->
   <div id="rotator">
-    <div class="clock">
-      <div class="time" id="time">--:--:--</div>
-      <div class="date" id="date">----</div>
+    <div class="clock" role="region" aria-label="StandBy mimic clock">
+      <div class="time glass-text" id="time">--:--:--</div>
+      <div class="date glass-text" id="date">----</div>
     </div>
   </div>
 
@@ -54,50 +125,119 @@
 (function(){
   const timeEl = document.getElementById('time');
   const dateEl = document.getElementById('date');
+  const toggleSeconds = document.getElementById('toggleSeconds');
+  const toggleWeekday = document.getElementById('toggleWeekday');
+  const alphaRange = document.getElementById('alpha');
+  const blurRange = document.getElementById('blur');
+  const settingsDrawer = document.getElementById('settingsDrawer');
+  const drawerOverlay = document.getElementById('drawerOverlay');
+  const closeDrawer = document.getElementById('closeDrawer');
 
-  function formatTwo(n){ return n.toString().padStart(2,'0'); }
-
+  function formatTwo(n){return n.toString().padStart(2,'0')}
   function updateClock(){
-    const d = new Date();
-    const hh = formatTwo(d.getHours());
-    const mm = formatTwo(d.getMinutes());
-    const ss = formatTwo(d.getSeconds());
-    timeEl.textContent = hh + ':' + mm + ':' + ss;
-    dateEl.textContent = d.toLocaleDateString();
+    const d=new Date();
+    const hh=formatTwo(d.getHours());const mm=formatTwo(d.getMinutes());const ss=formatTwo(d.getSeconds());
+    timeEl.textContent = toggleSeconds.checked ? `${hh}:${mm}:${ss}` : `${hh}:${mm}`;
+    const yyyy=d.getFullYear();const mo=formatTwo(d.getMonth()+1);const da=formatTwo(d.getDate());
+    const wdays=['日','月','火','水','木','金','土'];const wd=wdays[d.getDay()];
+    dateEl.textContent = toggleWeekday.checked ? `${yyyy}/${mo}/${da}（${wd}）` : `${yyyy}/${mo}/${da}`;
   }
 
-  // Align updates to the start of each second for stable ticking
-  (function scheduleTick(){
-    const now = new Date();
-    const ms = now.getMilliseconds();
-    updateClock();
-    setTimeout(function(){
-      updateClock();
-      setInterval(updateClock, 1000);
-    }, 1000 - ms);
-  })();
+  // Glass settings apply
+  function applyGlass(){
+    const clock=document.querySelector('.clock');
+    clock.style.setProperty('--glass-alpha', alphaRange.value);
+    clock.style.setProperty('--glass-blur', blurRange.value + 'px');
+    clock.style.backdropFilter = `blur(${blurRange.value}px) saturate(var(--glass-sat))`;
+    clock.style.webkitBackdropFilter = `blur(${blurRange.value}px) saturate(var(--glass-sat))`;
+}
+  alphaRange.addEventListener('input',applyGlass);
+  blurRange.addEventListener('input',applyGlass);
+  applyGlass();
 
-  // Resize handler: update CSS vars in case viewport changes
+  // Pointer tilt mapping that respects the rotator rotation
+  function handlePointerMove(e){
+    const rotStr=getComputedStyle(document.documentElement).getPropertyValue('--rot').trim();
+    const theta = parseFloat(rotStr) || 0; // degrees
+    const cx = window.innerWidth/2; const cy = window.innerHeight/2;
+    let vx = (e.clientX - cx); let vy = (e.clientY - cy);
+    // rotate the pointer by -theta to align with rotated content
+    const rad = -theta * Math.PI/180;
+    const vx2 = Math.cos(rad)*vx - Math.sin(rad)*vy;
+    const vy2 = Math.sin(rad)*vx + Math.cos(rad)*vy;
+    // determine logical half-dimensions (landscape logical dims)
+    const halfW = (Math.abs(theta - 90) < 0.1) ? window.innerHeight/2 : window.innerWidth/2;
+    const halfH = (Math.abs(theta - 90) < 0.1) ? window.innerWidth/2 : window.innerHeight/2;
+    let ndx = vx2/halfW; let ndy = vy2/halfH;
+    ndx = Math.max(-1,Math.min(1,ndx)); ndy = Math.max(-1,Math.min(1,ndy));
+    const clock = document.querySelector('.clock');
+    clock.style.setProperty('--tilt-x', `${(-ndy * 6).toFixed(2)}deg`);
+    clock.style.setProperty('--tilt-y', `${(ndx * 6).toFixed(2)}deg`);
+  }
+  document.addEventListener('pointermove', handlePointerMove);
+
+  // Ticking aligned to second
+  (function scheduleTick(){const now=new Date();const ms=now.getMilliseconds();updateClock();setTimeout(function(){updateClock();setInterval(updateClock,1000);},1000-ms);})();
+
+  // Auto-rotate and sizing
   function applyVars(){
-    document.documentElement.style.setProperty('--land-w', window.innerHeight + 'px');
-    document.documentElement.style.setProperty('--land-h', window.innerWidth + 'px');
+    const portrait = window.innerHeight > window.innerWidth;
+    document.documentElement.style.setProperty('--rot', portrait ? '90deg' : '0deg');
+    document.documentElement.style.setProperty('--land-w', portrait ? window.innerHeight + 'px' : window.innerWidth + 'px');
+    document.documentElement.style.setProperty('--land-h', portrait ? window.innerWidth + 'px' : window.innerHeight + 'px');
   }
-  window.addEventListener('resize', applyVars);
-  window.addEventListener('orientationchange', function(){ setTimeout(applyVars, 120); });
-  applyVars();
+  window.addEventListener('resize',applyVars);window.addEventListener('orientationchange',function(){setTimeout(applyVars,120)});applyVars();
 
-  // Try to keep screen awake when supported (no-op on iOS Safari but safe to call)
-  if ('wakeLock' in navigator) {
-    let wl;
-    navigator.wakeLock.request('screen').then(lock => { wl = lock; }).catch(()=>{});
-    document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'visible' && !wl) {
-        try { wl = await navigator.wakeLock.request('screen'); } catch(e){}
-      } else if (wl && document.visibilityState === 'hidden') {
-        try { await wl.release(); wl = null; } catch(e){}
-      }
-    });
-  }
+  // Settings drawer open/close logic
+  // landscape-top == portrait-right : swipe from right edge toward left
+  let touchStartX = null; let touchActive=false;
+
+  function openDrawer(){
+    settingsDrawer.classList.add('open');
+    settingsDrawer.style.pointerEvents = 'auto';
+    settingsDrawer.setAttribute('aria-hidden','false');
+    drawerOverlay.style.display = 'block';
+}
+  function closeDrawerFn(){
+    settingsDrawer.classList.remove('open');
+    settingsDrawer.style.pointerEvents = 'none';
+    settingsDrawer.setAttribute('aria-hidden','true');
+    drawerOverlay.style.display = 'none';
+}
+
+  // touch: start from right edge
+  document.addEventListener('touchstart',function(e){
+    const t = e.touches && e.touches[0];
+    if(!t) return;
+    if(t.clientX > window.innerWidth - 24){ touchStartX = t.clientX; touchActive=true; }
+  }, {passive:true});
+
+  document.addEventListener('touchmove',function(e){
+    if(!touchActive) return;
+    const t = e.touches && e.touches[0]; if(!t) return;
+    const dx = t.clientX - touchStartX;
+    if(dx < -40){ openDrawer(); touchActive=false; }
+  }, {passive:true});
+
+  document.addEventListener('touchend',function(){ touchStartX=null; touchActive=false; });
+
+  // mouse (desktop testing): drag from right edge
+  let mouseDown=false; let mouseStartX=0;
+  document.addEventListener('mousedown',function(e){ if(e.clientX > window.innerWidth - 20){ mouseDown=true; mouseStartX=e.clientX; }});
+  document.addEventListener('mousemove',function(e){ if(!mouseDown) return; const dx=e.clientX-mouseStartX; if(dx < -40){ openDrawer(); mouseDown=false; }});
+  document.addEventListener('mouseup',function(){ mouseDown=false; });
+
+  // overlay and close button
+  drawerOverlay.addEventListener('click', closeDrawerFn); closeDrawer.addEventListener('click', closeDrawerFn);
+
+  // allow ESC to close on desktop
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDrawerFn(); });
+
+  // ensure drawer hidden on load
+  closeDrawerFn();
+
+  // Try wake lock (no-op on iOS Safari)
+  if('wakeLock' in navigator){let wl;navigator.wakeLock.request('screen').then(lock=>{wl=lock}).catch(()=>{});document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&!wl){try{wl=await navigator.wakeLock.request('screen')}catch(e){} }else if(wl&&document.visibilityState==='hidden'){try{await wl.release();wl=null}catch(e){}}});}
 
 })();
 </script>
