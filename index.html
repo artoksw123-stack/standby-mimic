@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>StandBy mimic — rotated (seconds)</title>
+<style>
+  :root{
+    --bg:#000;
+    --fg:#fff;
+    /* logical "landscape" dimensions: swap vw/vh so layout is based on rotated viewport */
+    --land-w:100vh; /* width of the rotated (landscape) canvas */
+    --land-h:100vw; /* height of the rotated (landscape) canvas */
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);-webkit-user-select:none;overflow:hidden;font-family:-apple-system,"Hiragino Kaku Gothic ProN","SF Pro Text",Segoe UI,Roboto,sans-serif}
+
+  /* The rotator container is already rotated 90deg so the internal layout is landscape
+     no matter how the device is held. It is centered in the viewport. */
+  #rotator{
+    position:absolute;left:50%;top:50%;
+    width:var(--land-w);height:var(--land-h);
+    transform:translate(-50%,-50%) rotate(90deg);
+    transform-origin:center center;
+    display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+    padding-top:calc(var(--safe-top) + 8px);padding-bottom:calc(var(--safe-bottom) + 8px);
+    text-align:center;
+  }
+
+  .clock{font-weight:600;line-height:0.92;letter-spacing:0.02em}
+  /* slightly reduce base size to make room for seconds */
+  .time{font-size:calc(var(--land-w) * 0.16);}
+  .date{font-size:calc(var(--land-w) * 0.045);opacity:0.7;margin-top:0.5rem}
+
+  /* keep readable on large screens */
+  @media (min-width:900px){
+    .time{font-size:120px}
+    .date{font-size:28px}
+  }
+</style>
+</head>
+<body>
+  <div id="rotator">
+    <div class="clock">
+      <div class="time" id="time">--:--:--</div>
+      <div class="date" id="date">----</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const timeEl = document.getElementById('time');
+  const dateEl = document.getElementById('date');
+
+  function formatTwo(n){ return n.toString().padStart(2,'0'); }
+
+  function updateClock(){
+    const d = new Date();
+    const hh = formatTwo(d.getHours());
+    const mm = formatTwo(d.getMinutes());
+    const ss = formatTwo(d.getSeconds());
+    timeEl.textContent = hh + ':' + mm + ':' + ss;
+    dateEl.textContent = d.toLocaleDateString();
+  }
+
+  // Align updates to the start of each second for stable ticking
+  (function scheduleTick(){
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    updateClock();
+    setTimeout(function(){
+      updateClock();
+      setInterval(updateClock, 1000);
+    }, 1000 - ms);
+  })();
+
+  // Resize handler: update CSS vars in case viewport changes
+  function applyVars(){
+    document.documentElement.style.setProperty('--land-w', window.innerHeight + 'px');
+    document.documentElement.style.setProperty('--land-h', window.innerWidth + 'px');
+  }
+  window.addEventListener('resize', applyVars);
+  window.addEventListener('orientationchange', function(){ setTimeout(applyVars, 120); });
+  applyVars();
+
+  // Try to keep screen awake when supported (no-op on iOS Safari but safe to call)
+  if ('wakeLock' in navigator) {
+    let wl;
+    navigator.wakeLock.request('screen').then(lock => { wl = lock; }).catch(()=>{});
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && !wl) {
+        try { wl = await navigator.wakeLock.request('screen'); } catch(e){}
+      } else if (wl && document.visibilityState === 'hidden') {
+        try { await wl.release(); wl = null; } catch(e){}
+      }
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
