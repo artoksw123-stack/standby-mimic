@@ -101,3 +101,38 @@ html,body{
   applyGlass();
   function pointerTilt(e){
     const rot=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rot'))||0;
+    const cx=innerWidth/2,cy=innerHeight/2;
+    let vx=e.clientX-cx,vy=e.clientY-cy;
+    const r=-rot*Math.PI/180;
+    const rx=Math.cos(r)*vx-Math.sin(r)*vy;
+    const ry=Math.sin(r)*vx+Math.cos(r)*vy;
+    const hw=innerWidth/2,hh=innerHeight/2;
+    const nx=Math.max(-1,Math.min(1,rx/hw));
+    const ny=Math.max(-1,Math.min(1,ry/hh));
+    const s=parseFloat(tiltStrengthRange.value);
+    const c=document.querySelector('.clock');
+    c.style.setProperty('--tilt-x',(-ny*s).toFixed(2)+'deg');
+    c.style.setProperty('--tilt-y',(nx*s).toFixed(2)+'deg');
+  }
+  document.addEventListener('pointermove',pointerTilt);
+  function tick(){updateClock();setTimeout(()=>setInterval(updateClock,1000),1000-new Date().getMilliseconds())}
+  tick();
+  function applyVars(){
+    const portrait=innerHeight>innerWidth;
+    document.documentElement.style.setProperty('--rot',portrait?'90deg':'0deg');
+    document.documentElement.style.setProperty('--land-w',(portrait?innerHeight:innerWidth)+'px');
+    document.documentElement.style.setProperty('--land-h',(portrait?innerWidth:innerHeight)+'px');
+  }
+  addEventListener('resize',applyVars);applyVars();
+  function openDrawer(){settingsDrawer.classList.add('open');drawerOverlay.style.display='block'}
+  function closeDrawerFn(){settingsDrawer.classList.remove('open');drawerOverlay.style.display='none'}
+  let sx=null;
+  addEventListener('touchstart',e=>{const t=e.touches[0];if(t&&t.clientX>innerWidth-24)sx=t.clientX},{passive:true});
+  addEventListener('touchmove',e=>{if(sx!==null&&e.touches[0].clientX-sx<-40){openDrawer();sx=null}},{passive:true});
+  addEventListener('touchend',()=>sx=null);
+  closeDrawer.addEventListener('click',closeDrawerFn);
+  drawerOverlay.addEventListener('click',closeDrawerFn);
+})();
+</script>
+</body>
+</html>
